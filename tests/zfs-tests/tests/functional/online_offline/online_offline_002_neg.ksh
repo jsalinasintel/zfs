@@ -30,6 +30,7 @@
 #
 
 . $STF_SUITE/include/libtest.shlib
+. $STF_SUITE/tests/functional/online_offline/online_offline.cfg
 
 #
 # DESCRIPTION:
@@ -61,7 +62,9 @@ function cleanup
 
 	done
 
-	$KILL $killpid >/dev/null 2>&1
+	if $PS --no-headers -p $killpid > /dev/null; then
+		$KILL $killpid >/dev/null 2>&1
+	fi
 	[[ -e $TESTDIR ]] && log_must $RM -rf $TESTDIR/*
 }
 
@@ -69,7 +72,11 @@ log_assert "Turning both disks offline should fail."
 
 log_onexit cleanup
 
-$FILE_TRUNC -f $((64 * 1024 * 1024)) -b 8192 -c 0 -r $TESTDIR/$TESTFILE1 &
+if is_linux; then
+        $DD if=/dev/urandom iflag=fullblock bs=1M count=$((64 * 1024 * 1024)) of=$TESTDIR/$TESTFILE1 &
+else
+        $FILE_TRUNC -f $((64 * 1024 * 1024)) -b 8192 -c 0 -r $TESTDIR/$TESTFILE1 &
+fi 
 typeset killpid="$! "
 
 disks=($DISKLIST)
@@ -123,7 +130,9 @@ while [[ $i -lt ${#disks[*]} ]]; do
 	((i++))
 done
 
-log_must $KILL $killpid
+if $PS --no-headers -p $killpid > /dev/null; then
+	log_must $KILL $killpid
+fi
 $SYNC
 
 typeset dir=$(get_device_dir $DISKS)
