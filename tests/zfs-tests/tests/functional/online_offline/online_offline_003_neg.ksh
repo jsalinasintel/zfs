@@ -49,9 +49,7 @@ function cleanup
 		destroy_pool $TESTPOOL1
 	fi
 
-	if $PS --no-headers -p $killpid > /dev/null; then
-		$KILL $killpid >/dev/null 2>&1
-	fi
+	kill_process $killpid file_write
 	[[ -e $TESTDIR ]] && log_must $RM -rf $TESTDIR/*
 }
 
@@ -70,21 +68,16 @@ create_pool $TESTPOOL1 $specials_list
 log_must $ZFS create $TESTPOOL1/$TESTFS1
 log_must $ZFS set mountpoint=$TESTDIR1 $TESTPOOL1/$TESTFS1
 
-if is_linux; then
-        $DD if=/dev/urandom iflag=fullblock bs=1M count=$((64 * 1024 * 1024)) of=$TESTDIR/$TESTFILE1 &
-else
-        $FILE_TRUNC -f $((64 * 1024 * 1024)) -b 8192 -c 0 -r $TESTDIR/$TESTFILE1 &
-fi 
+$FILE_WRITE -f $TESTDIR/$TESTFILE1 -o create -b 8192 -c $((64 * 1024 * 1024)) -d 25 &
 typeset killpid="$! "
+log_note "$FILE_WRITE has started, killpid: $killpid"
 
 for i in 0 1 2; do
 	log_mustnot $ZPOOL offline $TESTPOOL1 ${disk[$i]}
 	check_state $TESTPOOL1 ${disk[$i]} "online"
 done
 
-if $PS --no-headers -p $killpid > /dev/null; then
-	log_must $KILL $killpid
-fi
+kill_process $killpid file_write
 $SYNC
 
 log_pass

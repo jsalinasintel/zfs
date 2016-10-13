@@ -61,22 +61,15 @@ function cleanup
 
 	done
 
-	if $PS --no-headers -p $killpid > /dev/null; then
-		$KILL $killpid >/dev/null 2>&1
-	fi
+	kill_process $killpid file_write
 	[[ -e $TESTDIR ]] && log_must $RM -rf $TESTDIR/*
 }
 
 log_assert "Turning a disk offline and back online during I/O completes."
 
-if is_linux; then
-	set -x 
-	$DD if=/dev/urandom iflag=fullblock bs=1M count=$((64 * 1024 * 1024)) of="$TESTDIR/$TESTFILE1" &
-	ls -l $TESTDIR/$TESTFILE1
-else
-	$FILE_TRUNC -f $((64 * 1024 * 1024)) -b 8192 -c 0 -r $TESTDIR/$TESTFILE1 &
-fi 
+$FILE_WRITE -f $TESTDIR/$TESTFILE1 -o create -b 8192 -c $((64 * 1024 * 1024)) -d 25 &
 typeset killpid="$! "
+log_note "$FILE_WRITE has started, killpid: $killpid"
 
 for disk in $DISKLIST; do
         for i in 'do_offline' 'do_offline_while_already_offline'; do
@@ -94,9 +87,7 @@ for disk in $DISKLIST; do
         fi
 done
 
-if $PS --no-headers -p $killpid > /dev/null; then
-	log_must $KILL $killpid
-fi
+kill_process $killpid file_write
 $SYNC
 
 typeset dir=$(get_device_dir $DISKS)
